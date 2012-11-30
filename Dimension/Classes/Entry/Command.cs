@@ -15,7 +15,6 @@ namespace Dimension
         private Document _doc;
         private UIDocument _uidoc;
         private UIApplication _uiapp;
-        private const string _template = @"L:\4_Revit\Imperial Templates\Generic Model.rft";
         private XYZ[] _vert = {   new XYZ(0.0,    0.0,    0.0),
                                   new XYZ(10.0,   0.0,    0.0),
                                   new XYZ(10.0,   10.0,   0.0),
@@ -23,7 +22,6 @@ namespace Dimension
                               };
         private ReferenceArray _width;
         private ReferenceArray _height;
-
         private ReferenceArray _leftCon;
         private ReferenceArray _botCon;
         private ReferenceArray _rightCon;
@@ -47,7 +45,6 @@ namespace Dimension
                 return Result.Failed;
             }
         }
-
 
         private void BuildFamily(Document familyDoc)
         {
@@ -76,7 +73,6 @@ namespace Dimension
                     }
                 }
             }
-
             catch (Exception ex)
             {
                 TaskDialog.Show("Build Error", ex.Message);
@@ -157,7 +153,6 @@ namespace Dimension
             catch (Exception ex)
             {
                 TaskDialog.Show("Extrusion Error", ex.Message);
-
                 return null;
             }
         }
@@ -173,9 +168,6 @@ namespace Dimension
                 itor.Reset();
                 itor.MoveNext();
                 Line l = itor.Current as Line;
-                _botCon.Append(l.Reference);
-                itor.MoveNext();
-                l = itor.Current as Line;
                 _rightCon.Append(l.Reference);
                 itor.MoveNext();
                 l = itor.Current as Line;
@@ -183,12 +175,15 @@ namespace Dimension
                 itor.MoveNext();
                 l = itor.Current as Line;
                 _leftCon.Append(l.Reference);
+                l = itor.Current as Line;
+                _botCon.Append(l.Reference);
             }
             ReferenceArrayArray conArray = new ReferenceArrayArray();
-            conArray.Append(_botCon);
+            
             conArray.Append(_rightCon);
             conArray.Append(_topCon);
             conArray.Append(_leftCon);
+            conArray.Append(_botCon);
 
             Line line = familyDoc.Application.Create.NewLine(_vert[1], _vert[2], true);
             ConstructConstraint(familyDoc, _rightCon, line);
@@ -212,28 +207,5 @@ namespace Dimension
             FamilyParameter param = familyDoc.FamilyManager.AddParameter(label, BuiltInParameterGroup.PG_CONSTRAINTS, ParameterType.Length, false);
             dim.Label = param;
         }
-
-        //private ModelCurve MakeLine(Document familyDoc, XYZ ptA, XYZ ptB)
-        //{
-        //    try
-        //    {
-        //        Line line = familyDoc.Application.Create.NewLine(ptA, ptB, true);
-        //        XYZ norm = ptA.CrossProduct(ptB);
-        //        if (norm.IsZeroLength()) norm = XYZ.BasisZ;
-        //        Plane plane = familyDoc.Application.Create.NewPlane(norm, ptB);
-                
-        //        SketchPlane skplane = familyDoc.FamilyCreate.NewSketchPlane(plane);
-
-        //        return familyDoc.FamilyCreate.NewModelCurve(line, skplane);
-        //    }
-
-        //    catch (Exception ex)
-        //    {
-        //        TaskDialog.Show("Line Error", ex.Message);
-
-        //        return null;
-        //    }
-        //}
-
     }
 }

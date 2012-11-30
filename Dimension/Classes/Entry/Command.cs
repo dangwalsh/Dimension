@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Linq;
+using System.Collections;
 using System.Collections.Generic;
 
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using Autodesk.Revit.Attributes;
 using Autodesk.Revit.ApplicationServices;
 
 namespace Dimension
 {
-    [Transaction(TransactionMode.Manual)]
+    [Autodesk.Revit.Attributes.Transaction(Autodesk.Revit.Attributes.TransactionMode.Manual)]
+    [Autodesk.Revit.Attributes.Regeneration(Autodesk.Revit.Attributes.RegenerationOption.Manual)]
     public class Command:IExternalCommand
     {
         private Document _doc;
@@ -26,6 +27,11 @@ namespace Dimension
         private ReferenceArray _botCon;
         private ReferenceArray _rightCon;
         private ReferenceArray _topCon;
+        private ArrayList _conArr;
+        private FamilyParameter _param;
+        private FamilyType _type;
+        private const string _name = "Obj";
+        private const double _area = 100.0;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -34,7 +40,7 @@ namespace Dimension
                 _uiapp = commandData.Application;
                 _uidoc = _uiapp.ActiveUIDocument;
                 _doc = _uidoc.Document;
-
+                
                 BuildFamily(_doc);
 
                 return Result.Succeeded;
@@ -71,6 +77,12 @@ namespace Dimension
                         SetConstraints(familyDoc,extrusion);
                         tC.Commit();
                     }
+                    //Transaction tF = new Transaction(familyDoc, "Set Formula");
+                    //if (tF.Start() == TransactionStatus.Started)
+                    //{
+                    //    SetFormula(familyDoc);
+                    //    tF.Commit();
+                    //}
                 }
             }
             catch (Exception ex)
@@ -95,6 +107,7 @@ namespace Dimension
                         _width = new ReferenceArray();
                         _leftCon.Append(rplane.Reference);
                         _width.Append(rplane.Reference);
+
                         ReferencePlane newplane = familyDoc.FamilyCreate.NewReferencePlane(_vert[1], _vert[2], new XYZ(0, 0, 1), familyDoc.ActiveView);
                         _rightCon.Append(newplane.Reference);
                         _width.Append(newplane.Reference);
@@ -146,6 +159,8 @@ namespace Dimension
                 ConstructParam(familyDoc, _width, line, "Width");
                 line = familyDoc.Application.Create.NewLine(_vert[1], _vert[2], true);
                 ConstructParam(familyDoc, _height, line, "Height");
+                SetFormula(familyDoc);
+                
 
                 return extrusion;
             }
@@ -185,27 +200,59 @@ namespace Dimension
             conArray.Append(_leftCon);
             conArray.Append(_botCon);
 
-            Line line = familyDoc.Application.Create.NewLine(_vert[1], _vert[2], true);
-            ConstructConstraint(familyDoc, _rightCon, line);
-            line = familyDoc.Application.Create.NewLine(_vert[2], _vert[3], true);
-            ConstructConstraint(familyDoc, _topCon, line);
-            line = familyDoc.Application.Create.NewLine(_vert[3], _vert[0], true);
-            ConstructConstraint(familyDoc, _leftCon, line);
-            line = familyDoc.Application.Create.NewLine(_vert[0], _vert[1], true);
-            ConstructConstraint(familyDoc, _botCon, line);
+            //Line line = familyDoc.Application.Create.NewLine(_vert[0], _vert[1], true);
+            ConstructConstraint(familyDoc, _rightCon);
+            //line = familyDoc.Application.Create.NewLine(_vert[1], _vert[2], true);
+            ConstructConstraint(familyDoc, _topCon);
+            //line = familyDoc.Application.Create.NewLine(_vert[2], _vert[3], true);
+            ConstructConstraint(familyDoc, _leftCon);
+            //line = familyDoc.Application.Create.NewLine(_vert[3], _vert[0], true);
+            //ConstructConstraint(familyDoc, _botCon, line);
         }
 
-        private void ConstructConstraint(Document familyDoc, ReferenceArray ra, Line line)
+        private void ConstructConstraint(Document familyDoc, ReferenceArray ra)
         {
-            Autodesk.Revit.DB.Dimension con = familyDoc.FamilyCreate.NewDimension(familyDoc.ActiveView, line, ra);
-            //con.IsLocked = true;
+            Reference ref1 = null;
+            Reference ref2 = null;
+            int i = 1;
+            foreach (Reference r in ra)
+            {
+                if (i == 1)
+                {
+                    ref1 = r;
+                }
+                else
+                {
+                    ref2 = r;
+                }
+                ++i;
+            }
+            Autodesk.Revit.DB.Dimension alignment = familyDoc.FamilyCreate.NewAlignment(familyDoc.ActiveView, ref1, ref2);
         }
 
         private void ConstructParam(Document familyDoc, ReferenceArray ra, Line line, string label)
         {
             Autodesk.Revit.DB.Dimension dim = familyDoc.FamilyCreate.NewDimension(familyDoc.ActiveView, line, ra);
-            FamilyParameter param = familyDoc.FamilyManager.AddParameter(label, BuiltInParameterGroup.PG_CONSTRAINTS, ParameterType.Length, false);
+            FamilyParameter param = familyDoc.FamilyManager.AddParameter(label, BuiltInParameterGroup.PG_CONSTRAINTS, ParameterType.Length, true);
+            //if (label == "Height") _param = param;
+            //if (label == "Height") familyDoc.FamilyManager.SetFormula(param, "Width");
             dim.Label = param;
+        }
+
+        private void SetFormula(Document familyDoc)
+        {
+            _type = familyDoc.FamilyManager.NewType(_name);
+            familyDoc.FamilyManager.AddParameter("Area", BuiltInParameterGroup.PG_CONSTRAINTS, ParameterType.Area, true); // need to add value
+            FamilyParameter param = familyDoc.FamilyManager.get_Parameter("Area");
+            if (null != param)
+            {
+                familyDoc.FamilyManager.Set(param, _area);
+            }
+            param = familyDoc.FamilyManager.get_Parameter("Height");
+            if (null != param)
+            {
+                familyDoc.FamilyManager.SetFormula(param, @"Area / Width");
+            }
         }
     }
 }
